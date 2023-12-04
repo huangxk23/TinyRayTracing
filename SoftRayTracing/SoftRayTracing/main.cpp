@@ -4,12 +4,13 @@
 #include <iostream>
 #include <vector>
 
-#include "shape.h"
+#include "Shape.h"
 
 #define M_PI 3.1415926535
 
-int width = 700;
-int height = 700;
+int width = 400;
+int height = 400;
+int spp = 1;
 
 struct Camera
 {
@@ -56,6 +57,18 @@ void write_Mat(cv::Mat& img, std::vector<Eigen::Vector3f> frame_buf)
 	}
 }
 
+HitRes closest_hit(Ray& ray, std::vector<Shape*> scene)
+{
+	HitRes hitpoint;
+	for (auto item : scene)
+	{
+		HitRes res = item -> intersect(ray);
+		if (res.isHit && res.distance < hitpoint.distance) hitpoint = res;
+	}
+
+	return hitpoint;
+}
+
 
 int main()
 {
@@ -63,26 +76,78 @@ int main()
 	
 	frame_buffer.resize(width * height, {255.0f,255.0f,255.0f});
 	
-	Camera cam(1.0f, {0.0f,0.0f,4.0f},90.0f);
+	Camera cam(1.0f, {0.0f,0.0f,2.05f},90.0f);
+
+	//build the scene
+	std::vector<Shape*> scene;
+	//right
+	Material m1(false,{0.5,0.5,1});
+	Triangle t1({ 1,1,1 }, { 1,1,-1 }, { 1,-1,1 }, m1);
+	Triangle t2({ 1,1,-1 }, { 1,-1,1 }, {1,-1,-1}, m1);
+	scene.emplace_back(&t1);
+	scene.emplace_back(&t2);
+
+	//up
+	Material m2(false, {0.5,0.5,0.5});
+	Triangle t3({ -1,1,-1 }, { 1,1,-1 }, {1,1,1},m2);
+	Triangle t4({ -1,1,-1 }, { 1,1,1 }, {-1,1,1},m2);
+	scene.emplace_back(&t3);
+	scene.emplace_back(&t4);
+
+	//left
+	Material m3(false, { 1, 0.5, 0.5 });
+	Triangle t5({ -1,1,1 }, { -1,1,-1 }, {-1,-1,1},m3);
+	Triangle t6({ -1,-1,-1 }, { -1,1,-1 }, {-1,-1,1},m3);
+	scene.emplace_back(&t5);
+	scene.emplace_back(&t6);
+	
+	//down
+	Material m4(false, {0.5,0.5,0.5});
+	Triangle t7({ -1,-1,1 }, { -1,-1,-1 }, {1,-1,1},m4);
+	Triangle t8({ 1,-1,-1 }, {-1,-1,-1}, {1,-1,1},m4);
+	scene.emplace_back(&t7);
+	scene.emplace_back(&t8);
+
+	//back
+	Material m5(false, { 0.1,1,1 });
+	Triangle t9({ -1,-1,-1 }, { -1,1,-1 }, {1,-1,-1},m5);
+	Triangle t10({ 1,1,-1 }, { -1,1,-1 }, {1,-1,-1},m5);
+	scene.emplace_back(&t9);
+	scene.emplace_back(&t10);
+
+	//ball
+	Material m6(false, { 0.7,0.3,0.3 });
+	Sphere s1({ 0,0,3 }, 0.5, m6);
+	scene.emplace_back(&s1);
+
+
 
 	while (1)
 	{
 		float y = 2.0f * cam.focal_length * tan(deg2rad(cam.fov / 2.0f));
 		float x = static_cast<float>(width) / static_cast<float>(height) * y;
-		for(int i = 0;i < width;++i)
+		for(int i = width - 1;i >= 0;--i)
 			for (int j = 0; j < height; ++j)
 			{
-				float viewport_x = x / static_cast<float>(width) * i - x / 2.0f + x / static_cast<float>(width) * cam.position.x();
-				float viewport_y = y / static_cast<float>(height) * j - y / 2.0f + y / static_cast<float>(height) * cam.position.y();
+				float viewport_x = x / static_cast<float>(width) * j - x / 2.0f + x / static_cast<float>(width) * cam.position.x();
+				float viewport_y = y / static_cast<float>(height) * i - y / 2.0f + y / static_cast<float>(height) * cam.position.y();
 				//std::cout << viewport_x << " " << viewport_y << std::endl;
 				Eigen::Vector3f view_coord(viewport_x,viewport_y,cam.position.z() - 1);
 				Eigen::Vector3f direction = (view_coord - cam.position).normalized();
 				//std::cout << direction << std::endl;
 				Ray ray(cam.position,direction);
 
-				frame_buffer[i * height + j].x() = clamp(0.0f, 1.0f, ray.direction.x() + 1.0f) * 255.0f;
-				frame_buffer[i * height + j].y() = clamp(0.0f, 1.0f, ray.direction.y() + 1.0f) * 255.0f;
-				frame_buffer[i * height + j].z() = clamp(0.0f, 1.0f, ray.direction.z() + 1.0f) * 255.0f;
+				Eigen::Vector3f color = { 0,0,0 };
+				for (int k = 0; k < spp; ++k)
+				{
+					HitRes res = closest_hit(ray, scene);
+					if (res.isHit) color += res.m.albedo;
+				}
+				color /= spp;
+				
+				frame_buffer[i * height + j].x() = clamp(0.0f, 1.0f, color.x()) * 255.0f;
+				frame_buffer[i * height + j].y() = clamp(0.0f, 1.0f, color.y()) * 255.0f;
+				frame_buffer[i * height + j].z() = clamp(0.0f, 1.0f, color.z()) * 255.0f;
 			}
 		
 		cv::Mat img = cv::Mat::ones(height, width, CV_8UC3);
