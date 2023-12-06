@@ -2,6 +2,8 @@
 #include <eigen3/Eigen/Eigen>
 #include <opencv2/opencv.hpp>
 #include <random>
+#include <math.h>
+#include <cmath>
 
 #define M_PI 3.1415926535
 
@@ -14,6 +16,7 @@ double randf()
 	return dis(gen);
 }
 
+//sample light
 Eigen::Vector3f sampleLight()
 {
 	float r1 = randf(), r2 = randf();
@@ -45,6 +48,36 @@ inline float deg2rad(const float& deg)
 inline float clamp(const float& lo, const float& hi, const float& v)
 {
 	return std::max(lo, std::min(hi, v));
+}
+
+// Compute reflection direction
+Eigen::Vector3f reflect(const Eigen::Vector3f& I, const Eigen::Vector3f& N)
+{
+	return -I + 2 * I.dot(N) * N;
+}
+
+// Compute refraction direction using Snell's law
+//
+// We need to handle with care the two possible situations:
+//
+//    - When the ray is inside the object
+//
+//    - When the ray is outside.
+//
+// If the ray is outside, you need to make cosi positive cosi = -N.I
+//
+// If the ray is inside, you need to invert the refractive indices and negate the normal N
+Eigen::Vector3f refract(const Eigen::Vector3f& I, const Eigen::Vector3f& N, const float& ior)
+{
+	float cosi = clamp(-1, 1, I.dot(N));
+	float etai = 1, etat = ior;
+	Eigen::Vector3f n = N;
+	if (cosi < 0) { cosi = -cosi; }
+	else { std::swap(etai, etat); n = -N; }
+	float eta = etai / etat;
+	float k = 1 - eta * eta * (1 - cosi * cosi);
+	Eigen::Vector3f v = { 0,0,0 };
+	return k < 0 ? v : eta* I + (eta * cosi - sqrtf(k)) * n;
 }
 
 //This function is used to convert the pixels' rgb value into opencv::Mat

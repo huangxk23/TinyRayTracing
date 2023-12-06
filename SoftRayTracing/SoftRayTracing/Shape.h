@@ -5,7 +5,7 @@
 
 enum class material_type
 {
-	reflectance, refractance, reflectance_and_refractance, diffuse
+	reflectance, refractance, diffuse
 };
 
 struct Material

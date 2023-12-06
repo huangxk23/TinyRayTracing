@@ -12,7 +12,7 @@
 
 int width = 400;
 int height = 400;
-int spp = 128;
+int spp = 512;
 Eigen::Vector3f lightnormal = {0,-1,0};
 
 struct Camera
@@ -58,7 +58,7 @@ Eigen::Vector3f shade(HitRes & hit,Ray& ray, std::vector<Shape*> scene,int depth
 		HitRes middle = closest_hit(direct,scene);
 		//if (middle.m.isEmit) std::cout << "hit " << middle.HitPos << std::endl;
 		bool blocked = false;
-		if ((middle.HitPos - pl).norm() < 1e-4) blocked = false;
+		if ((middle.HitPos - pl).norm() < 1e-3) blocked = false;
 		else blocked = true;
 		//blocked = false;
 		Eigen::Vector3f dir_l;
@@ -96,6 +96,38 @@ Eigen::Vector3f shade(HitRes & hit,Ray& ray, std::vector<Shape*> scene,int depth
 
 		return dir_l + dir_l;
 		
+	}
+	else if (hit.m.mtype == material_type::reflectance)
+	{
+		Eigen::Vector3f r_dir = reflect(-ray.direction,hit.normal);
+		Ray reflect_light;
+		reflect_light.position = hit.HitPos;
+		reflect_light.direction = r_dir;
+		HitRes point = closest_hit(reflect_light, scene);
+		if (point.isHit = false) return { 0,0,0 };
+		else
+		{
+			Eigen::Vector3f color = hit.m.albedo;
+			Eigen::Vector3f wi = shade(point, reflect_light, scene, depth + 1);
+			color = { color.x() * wi.x(),color.y() * wi.y(),color.z() * wi.z() };
+			return color;
+		}
+	}
+	else if (hit.m.mtype == material_type::refractance)
+	{
+		Eigen::Vector3f r_dir = refract(ray.direction, hit.normal, 0.5);
+		Ray refract_light;
+		refract_light.position = hit.HitPos;
+		refract_light.direction = r_dir;
+		HitRes point = closest_hit(refract_light, scene);
+		if (point.isHit = false) return { 0,0,0 };
+		else
+		{
+			Eigen::Vector3f color = hit.m.albedo;
+			Eigen::Vector3f wi = shade(point, refract_light, scene, depth + 1);
+			color = { color.x() * wi.x(),color.y() * wi.y(),color.z() * wi.z() };
+			return color;
+		}
 	}
 }
 
@@ -166,6 +198,16 @@ int main()
 	Material m6(false, { 0.4,0.4,0.4 },material_type::diffuse);
 	Sphere s1({ 0,0,0 }, 0.3, m6);
 	scene.emplace_back(&s1);
+
+	//ball
+	Material m7(false, { 1,1,1 }, material_type::reflectance);
+	Sphere s2({ 0.5,-1,0.5 }, 0.25, m7);
+	scene.emplace_back(&s2);
+
+	//ball
+	Material m8(false, { 1,1,1 }, material_type::reflectance);
+	Sphere s3({ -0.5,0.7,-0.5 }, 0.25, m7);
+	scene.emplace_back(&s3);
 
 	while (1)	
 	{
