@@ -3,11 +3,19 @@
 #include <limits>
 #include <cmath>
 
+enum class material_type
+{
+	reflectance, refractance, reflectance_and_refractance, diffuse
+};
+
 struct Material
 {
 	bool isEmit = false;
 	Eigen::Vector3f albedo = { 0,0,0 };
-	Material(bool emit, Eigen::Vector3f al) :isEmit(emit), albedo(al) {}
+	material_type mtype = material_type::diffuse;
+	float rate = 0.0f;
+	Material(bool emit, Eigen::Vector3f al,material_type t) :isEmit(emit), albedo(al),mtype(t) {}
+	Material(bool emit, Eigen::Vector3f al):isEmit(emit), albedo(al) {}
 	Material() {}
 };
 
@@ -17,6 +25,7 @@ struct HitRes
 	Eigen::Vector3f HitPos;
 	float distance = std::numeric_limits<float>::max();
 	Material m;
+	Eigen::Vector3f normal;
 	HitRes(){}
 };
 
@@ -25,6 +34,7 @@ struct Ray
 	Eigen::Vector3f position = { 0.0f,0.0f,0.0f };
 	Eigen::Vector3f direction = { 0.0f,0.0f,0.0f };
 	Ray(Eigen::Vector3f pos, Eigen::Vector3f dir) :position(pos), direction(dir) {}
+	Ray() {}
 };
 
 
@@ -42,7 +52,7 @@ class Triangle :public Shape
 {
 public:
 
-	Triangle(Eigen::Vector3f pa, Eigen::Vector3f pb, Eigen::Vector3f pc, Material pm) :a(pa), b(pb), c(pc), m(pm) {}
+	Triangle(Eigen::Vector3f pa, Eigen::Vector3f pb, Eigen::Vector3f pc, Eigen::Vector3f n,Material pm) :a(pa), b(pb), c(pc),normal(n),m(pm) {}
 	
 	HitRes intersect(Ray& ray)
 	{
@@ -63,6 +73,7 @@ public:
 		res.m = m;
 		res.HitPos = (1 - b1 - b2) * a + b1 * b + b2 * c;
 		res.distance = (res.HitPos - ray.position).norm();
+		res.normal = normal;
 		
 		return res;
 	}
@@ -71,6 +82,7 @@ public:
 private:
 	Eigen::Vector3f a, b, c;
 	Material m;
+	Eigen::Vector3f normal;
 };
 
 class Sphere:public Shape
@@ -99,6 +111,7 @@ public:
 				res.HitPos = ray.position + t * ray.direction;
 				res.distance = (ray.position - res.HitPos).norm();
 				res.m = m;
+				res.normal = (res.HitPos - o).normalized();
 			}
 			else res.isHit = false;
 		}
